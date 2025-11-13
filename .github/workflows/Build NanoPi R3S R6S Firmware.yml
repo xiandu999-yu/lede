@@ -1,0 +1,253 @@
+name: Build NanoPi R3S R6S Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      device_model:
+        description: 'Select device model'
+        required: true
+        default: 'R3S'
+        type: choice
+        options:
+        - R3S
+        - R6S'
+      enable_features:
+        description: 'Enable features'
+        required: false
+        type: string
+        default: 'shortcut-fe,luci,firewall'
+
+env:
+  VERSION: SNAPSHOT
+  KERNEL_VERSION: 6.1
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout LEDE source
+      uses: actions/checkout@v4
+
+    # Step 2: Set environment variables
+    - name: Setup environment
+      run: |
+        echo "BUILD_DATE=$(date +%Y%m%d-%H%M)" >> $GITHUB_ENV
+        echo "DEVICE_MODEL=${{ github.event.inputs.device_model }}" >> $GITHUB_ENV
+        
+        if [ "${{ github.event.inputs.device_model }}" = "R3S" ]; then
+          echo "TARGET_PLATFORM=rockchip" >> $GITHUB_ENV
+          echo "TARGET_SUBPLATFORM=armv8" >> $GITHUB_ENV
+          echo "DEVICE_PROFILE=friendlyarm_nanopi-r3s" >> $GITHUB_ENV
+        else
+          echo "TARGET_PLATFORM=rockchip" >> $GITHUB_ENV
+          echo "TARGET_SUBPLATFORM=armv8" >> $GITHUB_ENV
+          echo "DEVICE_PROFILE=friendlyarm_nanopi-r6s" >> $GITHUB_ENV
+        fi
+
+    # Step 3: Install build dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3 python3-pip rsync unzip zlib1g-dev file wget
+
+    # Step 4: Update feeds
+    - name: Update and install feeds
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    # Step 5: Apply base configuration
+    - name: Setup base config
+      run: |
+        # Clear existing config
+        > .config
+        
+        # Set target platform
+        echo "Setting target platform: ${{ env.TARGET_PLATFORM }}"
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}=y" >> .config
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}=y" >> .config
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}_DEVICE_${{ env.DEVICE_PROFILE }}=y" >> .config
+        
+        # Set kernel version
+        echo "CONFIG_KERNEL_6_1=y" >> .config
+        echo "CONFIG_DEFAULT_KERNEL_6_1=y" >> .config
+
+    # Step 6: Enable ALL kernel modules and features
+    - name: Enable complete kernel features
+      run: |
+        echo "Enabling complete kernel feature set..."
+        
+        # 启用所有内核模块
+        echo "CONFIG_ALL_KMODS=y" >> .config
+        echo "CONFIG_ALL_NONSHARED=y" >> .config
+        echo "CONFIG_ALL=y" >> .config
+        
+        # 内核配置 - 启用所有核心功能
+        echo "CONFIG_KERNEL_ALL=y" >> .config
+        echo "CONFIG_KERNEL_ALL_KMODS=y" >> .config
+        
+        # 文件系统支持
+        echo "CONFIG_KERNEL_EXT4_FS=y" >> .config
+        echo "CONFIG_KERNEL_FAT_FS=y" >> .config
+        echo "CONFIG_KERNEL_NTFS_FS=y" >> .config
+        echo "CONFIG_KERNEL_BTRFS_FS=y" >> .config
+        echo "CONFIG_KERNEL_F2FS_FS=y" >> .config
+        echo "CONFIG_KERNEL_XFS_FS=y" >> .config
+        
+        # 网络协议支持
+        echo "CONFIG_KERNEL_NET=y" >> .config
+        echo "CONFIG_KERNEL_INET=y" >> .config
+        echo "CONFIG_KERNEL_IPV6=y" >> .config
+        echo "CONFIG_KERNEL_NETDEVICES=y" >> .config
+        echo "CONFIG_KERNEL_ETHERNET=y" >> .config
+        echo "CONFIG_KERNEL_WLAN=y" >> .config
+        echo "CONFIG_KERNEL_WIRELESS=y" >> .config
+        
+        # USB 支持
+        echo "CONFIG_KERNEL_USB=y" >> .config
+        echo "CONFIG_KERNEL_USB_SUPPORT=y" >> .config
+        echo "CONFIG_KERNEL_USB_STORAGE=y" >> .config
+        echo "CONFIG_KERNEL_USB_NET=y" >> .config
+        
+        # 硬件驱动支持
+        echo "CONFIG_KERNEL_MMC=y" >> .config
+        echo "CONFIG_KERNEL_SDIO=y" >> .config
+        echo "CONFIG_KERNEL_PCI=y" >> .config
+        echo "CONFIG_KERNEL_PCIE=y" >> .config
+        echo "CONFIG_KERNEL_I2C=y" >> .config
+        echo "CONFIG_KERNEL_SPI=y" >> .config
+        
+        # 加密和安全
+        echo "CONFIG_KERNEL_CRYPTO=y" >> .config
+        echo "CONFIG_KERNEL_CRYPTO_USER=y" >> .config
+        echo "CONFIG_KERNEL_SECURITY=y" >> .config
+        
+        # 虚拟化支持
+        echo "CONFIG_KERNEL_VIRTUALIZATION=y" >> .config
+        echo "CONFIG_KERNEL_KVM=y" >> .config
+
+    # Step 7: Apply device specific config
+    - name: Apply device configuration
+      run: |
+        # Apply common nanopi config
+        if [ -f configs/nanopi-common ]; then
+          echo "Applying NanoPi common config..."
+          cat configs/nanopi-common >> .config
+        fi
+        
+        # Apply specific device config
+        if [ -f configs/${{ github.event.inputs.device_model }}-specific ]; then
+          echo "Applying ${{ github.event.inputs.device_model }} specific config..."
+          cat configs/${{ github.event.inputs.device_model }}-specific >> .config
+        fi
+
+    # Step 8: Enable shortcut-fe acceleration
+    - name: Configure network acceleration
+      run: |
+        echo "Enabling Shortcut-FE acceleration..."
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe=y" >> .config
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe-cm=y" >> .config
+        echo "CONFIG_PACKAGE_shortcut-fe=y" >> .config
+        
+        # Firewall configuration (fw4)
+        echo "CONFIG_PACKAGE_firewall4=y" >> .config
+        echo "CONFIG_PACKAGE_fw4=y" >> .config
+        echo "CONFIG_PACKAGE_iptables-nft=y" >> .config
+
+    # Step 9: Configure package management and essential packages
+    - name: Configure packages
+      run: |
+        # Package manager config
+        echo "CONFIG_PACKAGE_apk=y" >> .config
+        
+        # Base system packages
+        echo "CONFIG_PACKAGE_base-files=y" >> .config
+        echo "CONFIG_PACKAGE_busybox=y" >> .config
+        echo "CONFIG_PACKAGE_dropbear=y" >> .config
+        
+        # Network tools
+        echo "CONFIG_PACKAGE_ip-full=y" >> .config
+        echo "CONFIG_PACKAGE_iwinfo=y" >> .config
+        echo "CONFIG_PACKAGE_iptables=y" >> .config
+        
+        # Luci web interface
+        echo "CONFIG_PACKAGE_luci=y" >> .config
+        echo "CONFIG_PACKAGE_luci-ssl=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
+        
+        # Essential utilities
+        echo "CONFIG_PACKAGE_opkg=y" >> .config
+        echo "CONFIG_PACKAGE_wget-ssl=y" >> .config
+        echo "CONFIG_PACKAGE_curl=y" >> .config
+
+    # Step 10: Generate final config and resolve dependencies
+    - name: Generate final configuration
+      run: |
+        # Run defconfig to resolve dependencies
+        make defconfig
+        
+        echo "=== Configuration Generated ==="
+        echo "Device: NanoPi ${{ github.event.inputs.device_model }}"
+        echo "Version: ${{ env.VERSION }}"
+        echo "Kernel: ${{ env.KERNEL_VERSION }}"
+        echo "Features: Complete kernel modules enabled"
+
+    # Step 11: Start firmware compilation
+    - name: Compile firmware
+      run: |
+        echo "Starting firmware compilation for NanoPi ${{ github.event.inputs.device_model }}..."
+        echo "This may take a long time (30-90 minutes)..."
+        
+        # 开始编译 - 使用多线程加速
+        make -j$(nproc) V=s
+        
+        echo "Firmware compilation completed!"
+
+    # Step 12: Collect build artifacts
+    - name: Collect firmware artifacts
+      run: |
+        echo "Collecting firmware artifacts..."
+        
+        # 创建输出目录
+        mkdir -p firmware-artifacts
+        
+        # 复制固件文件
+        if [ -d bin/targets/${{ env.TARGET_PLATFORM }}/${{ env.TARGET_SUBPLATFORM }} ]; then
+          cp -r bin/targets/${{ env.TARGET_PLATFORM }}/${{ env.TARGET_SUBPLATFORM }}/* firmware-artifacts/
+        fi
+        
+        # 复制镜像文件
+        if [ -d bin/targets ]; then
+          find bin/targets -name "*.img" -o -name "*.bin" -o -name "*.gz" | xargs -I {} cp {} firmware-artifacts/ || true
+        fi
+        
+        # 生成构建报告
+        echo "NanoPi ${{ github.event.inputs.device_model }} Firmware Build Report" > firmware-artifacts/build-report.txt
+        echo "Build Time: ${{ env.BUILD_DATE }}" >> firmware-artifacts/build-report.txt
+        echo "Version: ${{ env.VERSION }}" >> firmware-artifacts/build-report.txt
+        echo "Kernel: ${{ env.KERNEL_VERSION }}" >> firmware-artifacts/build-report.txt
+        echo "Target: ${{ env.TARGET_PLATFORM }}/${{ env.TARGET_SUBPLATFORM }}" >> firmware-artifacts/build-report.txt
+        echo "Device: ${{ env.DEVICE_PROFILE }}" >> firmware-artifacts/build-report.txt
+        echo "Status: COMPLETED" >> firmware-artifacts/build-report.txt
+        
+        # 显示生成的文件
+        echo "Generated files:" >> firmware-artifacts/build-report.txt
+        ls -la firmware-artifacts/ >> firmware-artifacts/build-report.txt
+
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nanopi-${{ github.event.inputs.device_model }}-firmware
+        path: firmware-artifacts/
+        retention-days: 30
+
+    # Step 13: Completion notice
+    - name: Display build results
+      run: |
+        echo "✅ NanoPi ${{ github.event.inputs.device_model }} firmware build completed successfully!"
+        echo "📁 Firmware saved as artifact: nanopi-${{ github.event.inputs.device_model }}-firmware"
+        echo "🔧 Complete kernel features enabled: ALL_KMODS, filesystems, networking, USB, etc."
+        echo "⏰ Build time: ${{ env.BUILD_DATE }}"
