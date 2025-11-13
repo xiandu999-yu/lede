@@ -120,13 +120,26 @@ jobs:
           cat configs/${{ github.event.inputs.device_model }}-specific >> .config
         fi
 
-    # Step 9: Enable shortcut-fe acceleration
-    - name: Configure network acceleration
+    # Step 9: Enable TurboACC with all features
+    - name: Configure TurboACC acceleration
       run: |
-        echo "Enabling Shortcut-FE acceleration..."
+        echo "Enabling TurboACC with all acceleration features..."
+        
+        # TurboACC 核心包
+        echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
+        
+        # TurboACC 配置选项
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_FAST_CLASSIFIER=y" >> .config
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_SHORTCUT_FE=y" >> .config
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_SHORTCUT_FE_CM=y" >> .config
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_BBR_CCA=y" >> .config
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_DNSFORWARDER=y" >> .config
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_DNSPROXY=y" >> .config
+        
+        # 相关的内核模块
+        echo "CONFIG_PACKAGE_kmod-fast-classifier=y" >> .config
         echo "CONFIG_PACKAGE_kmod-shortcut-fe=y" >> .config
         echo "CONFIG_PACKAGE_kmod-shortcut-fe-cm=y" >> .config
-        echo "CONFIG_PACKAGE_shortcut-fe=y" >> .config
         
         # Firewall configuration (fw4)
         echo "CONFIG_PACKAGE_firewall4=y" >> .config
@@ -153,23 +166,19 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-quickstart=y" >> .config
         echo "CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y" >> .config
 
-    # Step 11: Verify quickstart packages are available
+    # Step 11: Verify package availability
     - name: Verify package availability
       run: |
         echo "=== Checking package availability ==="
         echo "Available quickstart packages:"
         ./scripts/feeds list | grep -i quickstart || echo "No quickstart packages found in feeds list"
         
-        echo "Package directories:"
-        find package feeds -name "*quickstart*" -type d 2>/dev/null | head -10 || echo "No quickstart directories found"
+        echo "Available turboacc packages:"
+        ./scripts/feeds list | grep -i turboacc || echo "No turboacc packages found in feeds list"
         
-        echo "smpackage feed status:"
-        if [ -d "feeds/smpackage" ]; then
-          echo "smpackage feed exists"
-          ls -la feeds/smpackage/ 2>/dev/null | head -5 || echo "Cannot access smpackage directory"
-        else
-          echo "WARNING: smpackage feed directory not found"
-        fi
+        echo "Package directories:"
+        find package feeds -name "*quickstart*" -type d 2>/dev/null | head -5
+        find package feeds -name "*turboacc*" -type d 2>/dev/null | head -5
 
     # Step 12: Generate final config
     - name: Generate final configuration
@@ -182,7 +191,10 @@ jobs:
         echo "Version: ${{ env.VERSION }}"
         echo "Kernel: ${{ env.KERNEL_VERSION }}"
         echo "Firewall: fw4"
-        echo "Acceleration: shortcut-fe"
+        echo "TurboACC: Enabled with all features"
+        echo "  - FAST_CLASSIFIER: Enabled"
+        echo "  - SHORTCUT_FE_CM: Enabled" 
+        echo "  - BBR CCA: Enabled"
         echo "Package Manager: apk"
         echo "Quickstart: Enabled"
         echo "Kernel Modules: CONFIG_ALL_KMODS enabled"
@@ -202,10 +214,13 @@ jobs:
         echo "Build Time: ${{ env.BUILD_DATE }}" >> artifacts/config-report.txt
         echo "Version: ${{ env.VERSION }}" >> artifacts/config-report.txt
         echo "Kernel: ${{ env.KERNEL_VERSION }}" >> artifacts/config-report.txt
-        echo "Enabled Features: shortcut-fe, fw4, apk, quickstart" >> artifacts/config-report.txt
+        echo "Enabled Features: TurboACC (full), fw4, apk, quickstart" >> artifacts/config-report.txt
         echo "Kernel Modules: CONFIG_ALL_KMODS=y" >> artifacts/config-report.txt
         
-        # Check quickstart package status
+        # Check TurboACC package status
+        echo "TurboACC Package Status:" >> artifacts/config-report.txt
+        grep "CONFIG_PACKAGE.*TURBOACC" .config >> artifacts/config-report.txt || echo "TurboACC packages not configured" >> artifacts/config-report.txt
+        
         echo "Quickstart Package Status:" >> artifacts/config-report.txt
         grep "CONFIG_PACKAGE.*quickstart" .config >> artifacts/config-report.txt || echo "Quickstart packages not configured" >> artifacts/config-report.txt
 
@@ -222,4 +237,8 @@ jobs:
         echo "✅ NanoPi ${{ github.event.inputs.device_model }} configuration generated successfully!"
         echo "📁 Files saved as artifact: nanopi-${{ github.event.inputs.device_model }}-config"
         echo "🔧 CONFIG_ALL_KMODS has been enabled for full kernel module support"
-        echo "🚀 Quickstart packages configured"
+        echo "🚀 TurboACC fully configured with:"
+        echo "   - FAST_CLASSIFIER"
+        echo "   - SHORTCUT_FE_CM" 
+        echo "   - BBR CCA"
+        echo "   - All acceleration features"
