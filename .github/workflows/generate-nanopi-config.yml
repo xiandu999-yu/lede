@@ -52,16 +52,23 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3 python3-pip rsync unzip zlib1g-dev file wget
 
-    # Step 4: Add small-package feed and update
-    - name: Add and update feeds
+    # Step 4: Clean up duplicate feeds and update
+    - name: Clean and update feeds
       run: |
-        # 首先添加small-package feed到feeds.conf
-        echo "src-git smpackage https://github.com/kenzok8/small-package" >> feeds.conf.default
+        # 显示当前feeds配置
+        echo "Current feeds.conf.default:"
+        cat feeds.conf.default
+        
+        # 移除重复的smpackage行（保留第14行的原始配置）
+        echo "Removing duplicate smpackage entries..."
+        awk '!seen[$0]++' feeds.conf.default > feeds.conf.default.tmp
+        mv feeds.conf.default.tmp feeds.conf.default
+        
+        echo "Cleaned feeds.conf.default:"
+        cat feeds.conf.default
         
         # 更新所有feeds
         ./scripts/feeds update -a
-        
-        # 安装所有基础包
         ./scripts/feeds install -a
 
     # Step 5: Apply base configuration
@@ -144,6 +151,15 @@ jobs:
         
         echo "Checking package directories..."
         find feeds -name "*quickstart*" -type d 2>/dev/null | head -10 || echo "No quickstart packages found in feeds directory"
+        
+        # 检查smpackage feed是否正常
+        echo "Checking smpackage feed..."
+        if [ -d "feeds/smpackage" ]; then
+          echo "smpackage feed exists, contents:"
+          ls feeds/smpackage/ 2>/dev/null | head -10 || echo "Cannot list smpackage contents"
+        else
+          echo "smpackage feed directory not found"
+        fi
 
     # Step 11: Generate final config
     - name: Generate final configuration
