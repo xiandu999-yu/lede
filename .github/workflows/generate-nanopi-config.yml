@@ -129,6 +129,7 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
         
         # TurboACC 配置选项
+        echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_FLOW_OFFLOADING=y" >> .config
         echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_FAST_CLASSIFIER=y" >> .config
         echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_SHORTCUT_FE=y" >> .config
         echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_SHORTCUT_FE_CM=y" >> .config
