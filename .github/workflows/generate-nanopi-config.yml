@@ -1,0 +1,162 @@
+name: Generate NanoPi R3S R6S Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      device_model:
+        description: 'Select device model'
+        required: true
+        default: 'R3S'
+        type: choice
+        options:
+        - R3S
+        - R6S
+      enable_features:
+        description: 'Enable features'
+        required: false
+        type: string
+        default: 'shortcut-fe,luci,firewall'
+
+env:
+  VERSION: SNAPSHOT
+  KERNEL_VERSION: 6.1
+
+jobs:
+  generate-config:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout LEDE source
+      uses: actions/checkout@v4
+
+    # Step 2: Set environment variables
+    - name: Setup environment
+      run: |
+        echo "BUILD_DATE=$(date +%Y%m%d-%H%M)" >> $GITHUB_ENV
+        echo "DEVICE_MODEL=${{ github.event.inputs.device_model }}" >> $GITHUB_ENV
+        
+        if [ "${{ github.event.inputs.device_model }}" = "R3S" ]; then
+          echo "TARGET_PLATFORM=rockchip" >> $GITHUB_ENV
+          echo "TARGET_SUBPLATFORM=armv8" >> $GITHUB_ENV
+          echo "DEVICE_PROFILE=friendlyarm_nanopi-r3s" >> $GITHUB_ENV
+        else
+          echo "TARGET_PLATFORM=rockchip" >> $GITHUB_ENV
+          echo "TARGET_SUBPLATFORM=armv8" >> $GITHUB_ENV
+          echo "DEVICE_PROFILE=friendlyarm_nanopi-r6s" >> $GITHUB_ENV
+        fi
+
+    # Step 3: Install build dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3 python3-pip rsync unzip zlib1g-dev file wget
+
+    # Step 4: Update feeds
+    - name: Update and install feeds
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    # Step 5: Apply base configuration
+    - name: Setup base config
+      run: |
+        # Clear existing config
+        > .config
+        
+        # Set target platform
+        echo "Setting target platform: ${{ env.TARGET_PLATFORM }}"
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}=y" >> .config
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}=y" >> .config
+        echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}_DEVICE_${{ env.DEVICE_PROFILE }}=y" >> .config
+        
+        # Set kernel version
+        echo "CONFIG_KERNEL_6_1=y" >> .config
+        echo "CONFIG_DEFAULT_KERNEL_6_1=y" >> .config
+
+    # Step 6: Apply device specific config
+    - name: Apply device configuration
+      run: |
+        # Apply common nanopi config
+        if [ -f configs/nanopi-common ]; then
+          echo "Applying NanoPi common config..."
+          cat configs/nanopi-common >> .config
+        fi
+        
+        # Apply specific device config
+        if [ -f configs/${{ github.event.inputs.device_model }}-specific ]; then
+          echo "Applying ${{ github.event.inputs.device_model }} specific config..."
+          cat configs/${{ github.event.inputs.device_model }}-specific >> .config
+        fi
+
+    # Step 7: Enable shortcut-fe acceleration
+    - name: Configure network acceleration
+      run: |
+        echo "Enabling Shortcut-FE acceleration..."
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe=y" >> .config
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe-cm=y" >> .config
+        echo "CONFIG_PACKAGE_shortcut-fe=y" >> .config
+        
+        # Firewall configuration (fw4)
+        echo "CONFIG_PACKAGE_firewall4=y" >> .config
+        echo "CONFIG_PACKAGE_fw4=y" >> .config
+        echo "CONFIG_PACKAGE_iptables-nft=y" >> .config
+
+    # Step 8: Configure package management
+    - name: Configure package manager
+      run: |
+        # Package manager config
+        echo "CONFIG_PACKAGE_apk=y" >> .config
+        
+        # Base system packages
+        echo "CONFIG_PACKAGE_base-files=y" >> .config
+        echo "CONFIG_PACKAGE_busybox=y" >> .config
+        echo "CONFIG_PACKAGE_dropbear=y" >> .config
+        
+        # Network tools
+        echo "CONFIG_PACKAGE_ip-full=y" >> .config
+        echo "CONFIG_PACKAGE_iwinfo=y" >> .config
+
+    # Step 9: Generate final config
+    - name: Generate final configuration
+      run: |
+        # Run defconfig to resolve dependencies
+        make defconfig
+        
+        echo "=== Configuration Generated ==="
+        echo "Device: NanoPi ${{ github.event.inputs.device_model }}"
+        echo "Version: ${{ env.VERSION }}"
+        echo "Kernel: ${{ env.KERNEL_VERSION }}"
+        echo "Firewall: fw4"
+        echo "Acceleration: shortcut-fe"
+        echo "Package Manager: apk"
+
+    # Step 10: Save and upload config files
+    - name: Save configuration files
+      run: |
+        # Create output directory
+        mkdir -p artifacts
+        
+        # Save config files
+        cp .config artifacts/nanopi-${{ github.event.inputs.device_model }}-config
+        cp .config artifacts/config-${{ env.BUILD_DATE }}
+        
+        # Generate config report
+        echo "NanoPi ${{ github.event.inputs.device_model }} Build Configuration" > artifacts/config-report.txt
+        echo "Build Time: ${{ env.BUILD_DATE }}" >> artifacts/config-report.txt
+        echo "Version: ${{ env.VERSION }}" >> artifacts/config-report.txt
+        echo "Kernel: ${{ env.KERNEL_VERSION }}" >> artifacts/config-report.txt
+        echo "Enabled Features: shortcut-fe, fw4, apk" >> artifacts/config-report.txt
+
+    - name: Upload configuration artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nanopi-${{ github.event.inputs.device_model }}-config
+        path: artifacts/
+        retention-days: 30
+
+    # Step 11: Completion notice
+    - name: Display results
+      run: |
+        echo "✅ NanoPi ${{ github.event.inputs.device_model }} configuration generated successfully!"
+        echo "📁 Files saved as artifact: nanopi-${{ github.event.inputs.device_model }}-config"
