@@ -1,4 +1,4 @@
-name: 生成NanoPi R3S/R6S配置文件
+name: 生成NanoPi R3S+R6S配置文件
 
 on:
   workflow_dispatch:  # 手动触发
