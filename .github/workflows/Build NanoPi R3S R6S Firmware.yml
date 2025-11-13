@@ -24,7 +24,7 @@ on:
 
 env:
   VERSION: SNAPSHOT
-  KERNEL_VERSION: 6.1
+  KERNEL_VERSION: 6.12
 
 jobs:
   build-firmware:
@@ -118,130 +118,78 @@ jobs:
         echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}=y" >> .config
         echo "CONFIG_TARGET_${{ env.TARGET_PLATFORM }}_${{ env.TARGET_SUBPLATFORM }}_DEVICE_${{ env.DEVICE_PROFILE }}=y" >> .config
         
-        # Set kernel version
-        echo "CONFIG_KERNEL_6_1=y" >> .config
-        echo "CONFIG_DEFAULT_KERNEL_6_1=y" >> .config
+        # Set kernel version to 6.12
+        echo "CONFIG_KERNEL_6_12=y" >> .config
+        echo "CONFIG_DEFAULT_KERNEL_6_12=y" >> .config
+        echo "# CONFIG_KERNEL_6_1 is not set" >> .config
+        echo "# CONFIG_DEFAULT_KERNEL_6_1 is not set" >> .config
 
-    # Step 8: Enable ALL kernel modules and features
-    - name: Enable complete kernel features
+    # Step 8: Enable specific kernel modules for required features
+    - name: Enable specific kernel modules
       run: |
-        echo "Enabling complete kernel feature set..."
+        echo "Enabling specific kernel modules for required features..."
         
-        # 启用所有内核模块
-        echo "CONFIG_ALL_KMODS=y" >> .config
-        echo "CONFIG_ALL_NONSHARED=y" >> .config
-        echo "CONFIG_ALL=y" >> .config
+        # 禁用全 KMODS，改为模块化编译
+        echo "# CONFIG_ALL_KMODS is not set" >> .config
+        echo "# CONFIG_ALL_NONSHARED is not set" >> .config
         
-        # 内核配置 - 启用所有核心功能
-        echo "CONFIG_KERNEL_ALL=y" >> .config
-        echo "CONFIG_KERNEL_ALL_KMODS=y" >> .config
+        # 网络加速相关模块
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-shortcut-fe-cm=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-fast-classifier=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-tcp-bbr=m" >> .config
         
-        # 文件系统支持
-        echo "CONFIG_KERNEL_EXT4_FS=y" >> .config
-        echo "CONFIG_KERNEL_FAT_FS=y" >> .config
-        echo "CONFIG_KERNEL_NTFS_FS=y" >> .config
-        echo "CONFIG_KERNEL_BTRFS_FS=y" >> .config
-        echo "CONFIG_KERNEL_F2FS_FS=y" >> .config
-        echo "CONFIG_KERNEL_XFS_FS=y" >> .config
+        # Fullcone NAT 支持
+        echo "CONFIG_PACKAGE_kmod-nft-fullcone=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-ipt-fullcone=m" >> .config
+        
+        # Docker 容器支持
+        echo "CONFIG_PACKAGE_kmod-veth=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-br-netfilter=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-ikconfig=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-nat=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-conntrack=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-conntrack-netlink=m" >> .config
+        
+        # 文件系统支持 (Docker 和 AList 需要)
+        echo "CONFIG_PACKAGE_kmod-fs-overlay=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-fuse=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-fs-ext4=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-fs-vfat=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-fs-ntfs=m" >> .config
+        
+        # ZRAM 压缩内存
+        echo "CONFIG_PACKAGE_kmod-zram=m" >> .config
+        
+        # USB 存储支持 (AList 需要)
+        echo "CONFIG_PACKAGE_kmod-usb-storage=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-usb-storage-uas=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-scsi-core=m" >> .config
         
         # 网络协议支持
-        echo "CONFIG_KERNEL_NET=y" >> .config
-        echo "CONFIG_KERNEL_INET=y" >> .config
-        echo "CONFIG_KERNEL_IPV6=y" >> .config
-        echo "CONFIG_KERNEL_NETDEVICES=y" >> .config
-        echo "CONFIG_KERNEL_ETHERNET=y" >> .config
-        echo "CONFIG_KERNEL_WLAN=y" >> .config
-        echo "CONFIG_KERNEL_WIRELESS=y" >> .config
+        echo "CONFIG_PACKAGE_kmod-ipv6=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-iptables=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-conntrack=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-nf-tproxy=m" >> .config
         
-        # USB 支持
-        echo "CONFIG_KERNEL_USB=y" >> .config
-        echo "CONFIG_KERNEL_USB_SUPPORT=y" >> .config
-        echo "CONFIG_KERNEL_USB_STORAGE=y" >> .config
-        echo "CONFIG_KERNEL_USB_NET=y" >> .config
+        # 加密支持
+        echo "CONFIG_PACKAGE_kmod-crypto-acompress=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-cbc=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-ccm=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-cmac=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-crc32c=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-ctr=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-ghash=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-gcm=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-hash=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-hmac=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-rng=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-seqiv=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-sha256=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-crypto-sha512=m" >> .config
         
-        # 硬件驱动支持
-        echo "CONFIG_KERNEL_MMC=y" >> .config
-        echo "CONFIG_KERNEL_SDIO=y" >> .config
-        echo "CONFIG_KERNEL_PCI=y" >> .config
-        echo "CONFIG_KERNEL_PCIE=y" >> .config
-        echo "CONFIG_KERNEL_I2C=y" >> .config
-        echo "CONFIG_KERNEL_SPI=y" >> .config
-        
-        # 加密和安全
-        echo "CONFIG_KERNEL_CRYPTO=y" >> .config
-        echo "CONFIG_KERNEL_CRYPTO_USER=y" >> .config
-        echo "CONFIG_KERNEL_SECURITY=y" >> .config
+        echo "Specific kernel modules enabled as modules"
 
-    # Step 8.5: Enable additional kernel features
-    - name: Enable advanced kernel features
-      run: |
-        echo "Enabling advanced kernel features..."
-        
-        # 网络协议
-        echo "CONFIG_NET_SCHED=y" >> .config
-        echo "CONFIG_NET_CLS=y" >> .config
-        echo "CONFIG_NET_CLS_U32=y" >> .config
-        echo "CONFIG_NET_SCH_SFQ=y" >> .config
-        echo "CONFIG_NET_SCH_HTB=y" >> .config
-        echo "CONFIG_NET_SCH_CODEL=y" >> .config
-        echo "CONFIG_NET_SCH_FQ_CODEL=y" >> .config
-        
-        # 安全模块
-        echo "CONFIG_SECURITY=y" >> .config
-        echo "CONFIG_SECURITY_NETWORK=y" >> .config
-        echo "CONFIG_SECURITY_SELINUX=y" >> .config
-        echo "CONFIG_SECURITY_APPARMOR=y" >> .config
-        
-        # 文件系统高级功能
-        echo "CONFIG_EXT4_FS_POSIX_ACL=y" >> .config
-        echo "CONFIG_EXT4_FS_SECURITY=y" >> .config
-        echo "CONFIG_BTRFS_FS_POSIX_ACL=y" >> .config
-        echo "CONFIG_F2FS_FS_SECURITY=y" >> .config
-        echo "CONFIG_XFS_FS_SECURITY=y" >> .config
-        
-        # 虚拟化支持
-        echo "CONFIG_VIRTIO=y" >> .config
-        echo "CONFIG_VIRTIO_PCI=y" >> .config
-        echo "CONFIG_VIRTIO_NET=y" >> .config
-        echo "CONFIG_VIRTIO_BLK=y" >> .config
-        
-        # 容器支持
-        echo "CONFIG_CGROUPS=y" >> .config
-        echo "CONFIG_CGROUP_CPUACCT=y" >> .config
-        echo "CONFIG_CGROUP_DEVICE=y" >> .config
-        echo "CONFIG_CGROUP_FREEZER=y" >> .config
-        echo "CONFIG_CGROUP_NET_PRIO=y" >> .config
-        echo "CONFIG_CGROUP_PERF=y" >> .config
-        echo "CONFIG_CGROUP_SCHED=y" >> .config
-        echo "CONFIG_CPUSETS=y" >> .config
-        echo "CONFIG_MEMCG=y" >> .config
-        echo "CONFIG_NAMESPACES=y" >> .config
-        echo "CONFIG_UTS_NS=y" >> .config
-        echo "CONFIG_IPC_NS=y" >> .config
-        echo "CONFIG_PID_NS=y" >> .config
-        echo "CONFIG_NET_NS=y" >> .config
-        
-        # 性能监控
-        echo "CONFIG_PERF_EVENTS=y" >> .config
-        echo "CONFIG_TRACING=y" >> .config
-        echo "CONFIG_FTRACE=y" >> .config
-        
-        # 内存管理
-        echo "CONFIG_SWAP=y" >> .config
-        echo "CONFIG_ZSWAP=y" >> .config
-        echo "CONFIG_ZRAM=y" >> .config
-        
-        # 块设备
-        echo "CONFIG_BLK_DEV=y" >> .config
-        echo "CONFIG_BLK_DEV_DM=y" >> .config
-        echo "CONFIG_DM_CRYPT=y" >> .config
-        echo "CONFIG_MD=y" >> .config
-        echo "CONFIG_BLK_DEV_MD=y" >> .config
-        echo "CONFIG_MD_RAID0=y" >> .config
-        echo "CONFIG_MD_RAID1=y" >> .config
-        
-        echo "Advanced kernel features enabled"
-        
     # Step 9: Apply device specific config
     - name: Apply device configuration
       run: |
@@ -257,65 +205,85 @@ jobs:
           cat configs/${{ github.event.inputs.device_model }}-specific >> .config
         fi
 
-    # Step 10: Enable TurboACC with all features
-    - name: Configure TurboACC acceleration
+    # Step 10: Enable required applications
+    - name: Configure applications
       run: |
-        echo "Enabling TurboACC with all acceleration features..."
+        echo "Enabling required applications..."
         
-        # TurboACC 核心包
-        echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
+        # APK 软件包管理器
+        echo "CONFIG_PACKAGE_apk=y" >> .config
         
-        # TurboACC 配置选项
+        # TurboACC 加速
+        echo "CONFIG_PACKAGE_luci-app-turboacc=m" >> .config
         echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_FLOW_OFFLOADING=y" >> .config
         echo "CONFIG_PACKAGE_TURBOACC_INCLUDE_BBR_CCA=y" >> .config
         
-        # 相关的内核模块
-        echo "CONFIG_PACKAGE_kmod-fast-classifier=y" >> .config
-        echo "CONFIG_PACKAGE_kmod-shortcut-fe=y" >> .config
-        echo "CONFIG_PACKAGE_kmod-shortcut-fe-cm=y" >> .config
-        echo "CONFIG_PACKAGE_kmod-tcp-bbr=y" >> .config
+        # 代理软件 (singbox / clash-like)
+        echo "CONFIG_PACKAGE_singbox=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-ssr-plus=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-passwall=m" >> .config
         
-        # Firewall configuration (fw4)
+        # DNS 服务
+        echo "CONFIG_PACKAGE_smartdns=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-smartdns=m" >> .config
+        echo "CONFIG_PACKAGE_mosdns=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-mosdns=m" >> .config
+        
+        # Docker 容器
+        echo "CONFIG_PACKAGE_docker=m" >> .config
+        echo "CONFIG_PACKAGE_dockerd=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-docker=m" >> .config
+        
+        # ZRAM 压缩内存
+        echo "CONFIG_PACKAGE_zram-swap=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-zram=m" >> .config
+        
+        # AList 文件列表
+        echo "CONFIG_PACKAGE_alist=m" >> .config
+        echo "CONFIG_PACKAGE_luci-app-alist=m" >> .config
+        
+        # Fullcone NAT
+        echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
         echo "CONFIG_PACKAGE_firewall4=y" >> .config
-        echo "CONFIG_PACKAGE_fw4=y" >> .config
         echo "CONFIG_PACKAGE_iptables-nft=y" >> .config
-
-    # Step 11: Configure package management and essential packages
-    - name: Configure packages
-      run: |
-        # Package manager config
-        echo "CONFIG_PACKAGE_apk=y" >> .config
+        echo "CONFIG_PACKAGE_iptables-mod-fullconenat=y" >> .config
         
-        # Base system packages
+        # Quickstart
+        echo "CONFIG_PACKAGE_quickstart=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-quickstart=y" >> .config
+
+    # Step 11: Configure base system packages
+    - name: Configure base packages
+      run: |
+        echo "Configuring base system packages..."
+        
+        # 基础系统
         echo "CONFIG_PACKAGE_base-files=y" >> .config
         echo "CONFIG_PACKAGE_busybox=y" >> .config
         echo "CONFIG_PACKAGE_dropbear=y" >> .config
+        echo "CONFIG_PACKAGE_opkg=y" >> .config
         
-        # Network tools
+        # 网络工具
         echo "CONFIG_PACKAGE_ip-full=y" >> .config
         echo "CONFIG_PACKAGE_iwinfo=y" >> .config
         echo "CONFIG_PACKAGE_iptables=y" >> .config
         
-        # Luci web interface
+        # Luci 界面
         echo "CONFIG_PACKAGE_luci=y" >> .config
         echo "CONFIG_PACKAGE_luci-ssl=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
         
-        # Quickstart packages
-        echo "CONFIG_PACKAGE_quickstart=y" >> .config
-        echo "CONFIG_PACKAGE_luci-app-quickstart=y" >> .config
-        echo "CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y" >> .config
-        
-        # Essential utilities
-        echo "CONFIG_PACKAGE_opkg=y" >> .config
+        # 工具
         echo "CONFIG_PACKAGE_wget-ssl=y" >> .config
         echo "CONFIG_PACKAGE_curl=y" >> .config
         
-        # 禁用不必要的开发工具和调试包
+        # 禁用不必要的包
         echo "# CONFIG_PACKAGE_valgrind is not set" >> .config
         echo "# CONFIG_PACKAGE_gdb is not set" >> .config
         echo "# CONFIG_PACKAGE_strace is not set" >> .config
         echo "# CONFIG_PACKAGE_ltrace is not set" >> .config
+        echo "# CONFIG_PACKAGE_perl is not set" >> .config
+        echo "# CONFIG_PACKAGE_python3 is not set" >> .config
 
     # Step 12: Verify package availability
     - name: Verify package availability
@@ -324,8 +292,11 @@ jobs:
         echo "Available quickstart packages:"
         ./scripts/feeds list | grep -i quickstart || echo "No quickstart packages found in feeds list"
         
-        echo "Available turboacc packages:"
-        ./scripts/feeds list | grep -i turboacc || echo "No turboacc packages found in feeds list"
+        echo "Available proxy packages:"
+        ./scripts/feeds list | grep -i -E "singbox|passwall|ssr" || echo "No proxy packages found in feeds list"
+        
+        echo "Available APK packages:"
+        ./scripts/feeds list | grep -i apk || echo "No APK packages found in feeds list"
 
     # Step 13: Generate final config and resolve dependencies
     - name: Generate final configuration
@@ -337,9 +308,17 @@ jobs:
         echo "Device: NanoPi ${{ github.event.inputs.device_model }}"
         echo "Version: ${{ env.VERSION }}"
         echo "Kernel: ${{ env.KERNEL_VERSION }}"
-        echo "Features: Complete kernel modules enabled"
-        echo "TurboACC: Full acceleration suite"
-        echo "Quickstart: Enabled from small-package"
+        echo "Package Manager: APK"
+        echo "Enabled Features:"
+        echo "  - Singbox / Clash-like proxy"
+        echo "  - Shortcut-FE acceleration"
+        echo "  - TurboACC with fullcone NAT"
+        echo "  - Docker container support"
+        echo "  - Fast classifier"
+        echo "  - SmartDNS & MosDNS"
+        echo "  - ZRAM compression"
+        echo "  - AList file manager"
+        echo "  - Quickstart"
 
     # Step 14: Start firmware compilation
     - name: Compile firmware
@@ -379,9 +358,11 @@ jobs:
         echo "Build Time: ${{ env.BUILD_DATE }}" >> firmware-artifacts/build-report.txt
         echo "Version: ${{ env.VERSION }}" >> firmware-artifacts/build-report.txt
         echo "Kernel: ${{ env.KERNEL_VERSION }}" >> firmware-artifacts/build-report.txt
+        echo "Package Manager: APK" >> firmware-artifacts/build-report.txt
         echo "Target: ${{ env.TARGET_PLATFORM }}/${{ env.TARGET_SUBPLATFORM }}" >> firmware-artifacts/build-report.txt
         echo "Device: ${{ env.DEVICE_PROFILE }}" >> firmware-artifacts/build-report.txt
-        echo "Features: TurboACC (Full), Quickstart, ALL_KMODS" >> firmware-artifacts/build-report.txt
+        echo "Features: Singbox, TurboACC, Docker, SmartDNS, ZRAM, AList" >> firmware-artifacts/build-report.txt
+        echo "Kernel Modules: Specific modules only (not ALL_KMODS)" >> firmware-artifacts/build-report.txt
         echo "Cache Used: ${{ github.event.inputs.clean_cache == 'true' && 'No (cleaned)' || 'Yes' }}" >> firmware-artifacts/build-report.txt
         echo "Status: COMPLETED" >> firmware-artifacts/build-report.txt
         
@@ -401,8 +382,9 @@ jobs:
       run: |
         echo "✅ NanoPi ${{ github.event.inputs.device_model }} firmware build completed successfully!"
         echo "📁 Firmware saved as artifact: nanopi-${{ github.event.inputs.device_model }}-firmware"
-        echo "🔧 Complete kernel features enabled: ALL_KMODS, filesystems, networking, USB, etc."
-        echo "🚀 TurboACC fully configured: FLOW_OFFLOADING, FAST_CLASSIFIER, BBR, SHORTCUT_FE"
-        echo "🎯 Quickstart package integrated from small-package"
+        echo "🔧 Specific kernel modules enabled (not ALL_KMODS)"
+        echo "🐧 Kernel Version: ${{ env.KERNEL_VERSION }}"
+        echo "📦 Package Manager: APK"
+        echo "🚀 Enabled features: Singbox, TurboACC, Docker, SmartDNS, ZRAM, AList"
         echo "💾 Build cache: ${{ github.event.inputs.clean_cache == 'true' && 'Cleaned (fresh build)' || 'Used (cached build)' }}"
         echo "⏰ Build time: ${{ env.BUILD_DATE }}"
