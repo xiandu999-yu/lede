@@ -74,7 +74,15 @@ jobs:
         echo "CONFIG_KERNEL_6_1=y" >> .config
         echo "CONFIG_DEFAULT_KERNEL_6_1=y" >> .config
 
-    # Step 6: Apply device specific config
+    # Step 6: Enable ALL kernel modules (重要添加)
+    - name: Enable all kernel modules
+      run: |
+        echo "Enabling CONFIG_ALL_KMODS for complete kernel module support..."
+        echo "CONFIG_ALL_KMODS=y" >> .config
+        echo "CONFIG_ALL_NONSHARED=y" >> .config
+        echo "CONFIG_ALL=y" >> .config
+
+    # Step 7: Apply device specific config
     - name: Apply device configuration
       run: |
         # Apply common nanopi config
@@ -89,7 +97,7 @@ jobs:
           cat configs/${{ github.event.inputs.device_model }}-specific >> .config
         fi
 
-    # Step 7: Enable shortcut-fe acceleration
+    # Step 8: Enable shortcut-fe acceleration
     - name: Configure network acceleration
       run: |
         echo "Enabling Shortcut-FE acceleration..."
@@ -102,7 +110,7 @@ jobs:
         echo "CONFIG_PACKAGE_fw4=y" >> .config
         echo "CONFIG_PACKAGE_iptables-nft=y" >> .config
 
-    # Step 8: Configure package management
+    # Step 9: Configure package management
     - name: Configure package manager
       run: |
         # Package manager config
@@ -117,7 +125,7 @@ jobs:
         echo "CONFIG_PACKAGE_ip-full=y" >> .config
         echo "CONFIG_PACKAGE_iwinfo=y" >> .config
 
-    # Step 9: Generate final config
+    # Step 10: Generate final config
     - name: Generate final configuration
       run: |
         # Run defconfig to resolve dependencies
@@ -130,8 +138,9 @@ jobs:
         echo "Firewall: fw4"
         echo "Acceleration: shortcut-fe"
         echo "Package Manager: apk"
+        echo "Kernel Modules: CONFIG_ALL_KMODS enabled"
 
-    # Step 10: Save and upload config files
+    # Step 11: Save and upload config files
     - name: Save configuration files
       run: |
         # Create output directory
@@ -147,6 +156,11 @@ jobs:
         echo "Version: ${{ env.VERSION }}" >> artifacts/config-report.txt
         echo "Kernel: ${{ env.KERNEL_VERSION }}" >> artifacts/config-report.txt
         echo "Enabled Features: shortcut-fe, fw4, apk" >> artifacts/config-report.txt
+        echo "Kernel Modules: CONFIG_ALL_KMODS=y" >> artifacts/config-report.txt
+        
+        # Check and display ALL_KMODS status
+        echo "CONFIG_ALL_KMODS Status Check:" >> artifacts/config-report.txt
+        grep "CONFIG_ALL_KMODS" .config >> artifacts/config-report.txt
 
     - name: Upload configuration artifacts
       uses: actions/upload-artifact@v4
@@ -155,8 +169,10 @@ jobs:
         path: artifacts/
         retention-days: 30
 
-    # Step 11: Completion notice
+    # Step 12: Completion notice
     - name: Display results
       run: |
         echo "✅ NanoPi ${{ github.event.inputs.device_model }} configuration generated successfully!"
         echo "📁 Files saved as artifact: nanopi-${{ github.event.inputs.device_model }}-config"
+        echo "🔧 CONFIG_ALL_KMODS has been enabled for full kernel module support"
+        echo "📦 This includes all available kernel modules in the build"
